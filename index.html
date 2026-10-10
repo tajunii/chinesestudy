@@ -186,13 +186,13 @@
 
                 const rows = result.data.slice(1);
                 db = rows.map(cols => ({
-                    id: cols[0]?.trim() || "",
-                    category: cols[1]?.trim() || "",
-                    cn: cols[2]?.trim() || "",
-                    pinyin: cols[3]?.trim() || "",
-                    kr: cols[4]?.trim() || "",
-                    audioFile: cols[5]?.trim() || "",
-                    hangul: cols[6]?.trim() || "" 
+                    id: cols[0]?.trim() || "",        // A열: 번호
+                    category: cols[1]?.trim() || "",  // B열: 분류
+                    cn: cols[2]?.trim() || "",        // C열: 중국어
+                    pinyin: cols[3]?.trim() || "",    // D열: 병음
+                    hangul: cols[4]?.trim() || "",    // E열: 한글 발음
+                    kr: cols[5]?.trim() || "",        // F열: 한국어 뜻
+                    audioFile: cols[6]?.trim() || ""  // G열: 음성파일명
                 })).filter(item => item.cn && item.kr);
 
                 if(db.length > 0) {
