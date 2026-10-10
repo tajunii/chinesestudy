@@ -208,4 +208,273 @@
                     showError("데이터를 찾을 수 없습니다.<br>시트에 데이터가 올바르게 입력되어 있는지 확인해주세요.");
                 }
             },
-            error: function(err)
+            error: function(err) {
+                console.error("데이터 로드 실패:", err);
+                showError("데이터를 가져오지 못했습니다. (에러: " + err.message + ")");
+            }
+        });
+    }
+
+    function showError(message) {
+        document.getElementById("preview-list").innerHTML = 
+            `<div class="text-center p-8 bg-slate-800 rounded-lg max-w-2xl mx-auto mt-10">
+                <h2 class="text-2xl text-red-400 font-bold mb-4">데이터 연동 오류</h2>
+                <p class="text-xl text-slate-300">${message}</p>
+            </div>`;
+        document.getElementById("q-kr").textContent = "데이터 로드 실패";
+        document.getElementById("btn-show-answer").style.display = "none";
+    }
+
+    // ---------------------------------------------------------
+    // 3. 탭(모드) 전환 로직
+    // ---------------------------------------------------------
+    const tabPreview = document.getElementById('tab-preview');
+    const tabQuiz = document.getElementById('tab-quiz');
+    const viewPreview = document.getElementById('view-preview');
+    const viewQuiz = document.getElementById('view-quiz');
+
+    function switchMode(mode) {
+        currentMode = mode;
+        currentAudio.pause();
+
+        if(mode === 'preview') {
+            tabPreview.classList.add('active');
+            tabQuiz.classList.remove('active');
+            viewPreview.classList.remove('hidden');
+            viewQuiz.classList.add('hidden');
+            
+            if(previewNodes.length > 0) updatePreviewFocus();
+        } else {
+            tabQuiz.classList.add('active');
+            tabPreview.classList.remove('active');
+            viewQuiz.classList.remove('hidden');
+            viewPreview.classList.add('hidden');
+            
+            document.getElementById('btn-show-answer').focus();
+        }
+    }
+
+    tabPreview.addEventListener('click', () => switchMode('preview'));
+    tabQuiz.addEventListener('click', () => switchMode('quiz'));
+
+    // ---------------------------------------------------------
+    // 4. 예습(쉐도잉) 모드 로직
+    // ---------------------------------------------------------
+    let previewFocusIndex = -1;
+    let previewNodes = [];
+
+    function initPreviewMode() {
+        const listContainer = document.getElementById('preview-list');
+        listContainer.innerHTML = '';
+        
+        db.forEach((item, index) => {
+            const box = document.createElement('div');
+            box.className = 'sentence-box';
+            box.id = `preview-box-${index}`;
+            
+            const pinyinDisplay = item.hangul ? `${item.pinyin} [${item.hangul}]` : item.pinyin;
+
+            box.innerHTML = `
+                <div class="kr-trans">${item.category} | ${item.kr}</div>
+                <div class="pinyin">${pinyinDisplay}</div>
+                <div class="cn-main zh-text">${item.cn}</div>
+            `;
+            
+            box.addEventListener('click', () => {
+                previewFocusIndex = index;
+                updatePreviewFocus();
+                playCurrentPreviewAudio();
+            });
+
+            listContainer.appendChild(box);
+        });
+        
+        previewNodes = document.querySelectorAll('.sentence-box');
+        if(previewNodes.length > 0) {
+            previewFocusIndex = 0;
+            updatePreviewFocus();
+        }
+    }
+
+    function updatePreviewFocus() {
+        if(currentMode !== 'preview' || previewNodes.length === 0) return;
+        
+        previewNodes.forEach(node => node.classList.remove('focused'));
+        
+        if(previewFocusIndex >= 0 && previewFocusIndex < previewNodes.length) {
+            const target = previewNodes[previewFocusIndex];
+            target.classList.add('focused');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function playCurrentPreviewAudio() {
+        if(previewFocusIndex >= 0 && previewFocusIndex < db.length) {
+            const filename = db[previewFocusIndex].audioFile;
+            if(filename) {
+                currentAudio.src = AUDIO_BASE_URL + filename;
+                currentAudio.play().catch(e => console.log("오디오 재생 오류:", e));
+            }
+        }
+    }
+
+    // ---------------------------------------------------------
+    // 5. 퀴즈 모드 로직
+    // ---------------------------------------------------------
+    const STORAGE_KEY = "cnQuizProgress";
+    let quizRemainingIndices = [];
+    let currentQuizItem = null;
+    let quizCategory = "all";
+    let quizStudyCount = 0;
+
+    const qKr = document.getElementById('q-kr');
+    const qAnswer = document.getElementById('q-answer');
+    const qCn = document.getElementById('q-cn');
+    const qPinyin = document.getElementById('q-pinyin');
+    const btnShowAnswer = document.getElementById('btn-show-answer');
+    const evalBtns = document.getElementById('eval-btns');
+    const btnEasy = document.getElementById('btn-easy');
+    const btnHard = document.getElementById('btn-hard');
+    const catSelect = document.getElementById('categorySelect');
+    const progressEl = document.getElementById('progress-bar');
+
+    function initQuizMode() {
+        const categories = [...new Set(db.map(i => i.category).filter(Boolean))];
+        categories.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c; opt.textContent = c;
+            catSelect.appendChild(opt);
+        });
+
+        if (!loadQuizProgress()) {
+            resetQuiz();
+        } else {
+            catSelect.value = quizCategory;
+        }
+        nextQuizQuestion();
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function resetQuiz() {
+        quizRemainingIndices = db
+            .map((item, idx) => ({ item, idx }))
+            .filter(obj => quizCategory === "all" || obj.item.category === quizCategory)
+            .map(obj => obj.idx);
+        
+        shuffleArray(quizRemainingIndices);
+        quizStudyCount = 0;
+        saveQuizProgress();
+        updateQuizProgress();
+    }
+
+    function saveQuizProgress() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            indices: quizRemainingIndices,
+            category: quizCategory,
+            count: quizStudyCount
+        }));
+    }
+
+    function loadQuizProgress() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if(!saved) return false;
+        const p = JSON.parse(saved);
+        if(p.indices && p.indices.length > 0) {
+            quizRemainingIndices = p.indices;
+            quizCategory = p.category || "all";
+            quizStudyCount = p.count || 0;
+            return true;
+        }
+        return false;
+    }
+
+    function updateQuizProgress() {
+        const total = db.filter(i => quizCategory === "all" || i.category === quizCategory).length;
+        const solved = total - quizRemainingIndices.length;
+        progressEl.innerHTML = `
+            <span class="stat-master">✅ 완벽 암기 : ${solved} / ${total}</span>
+            <span class="stat-count">🔄 누적 학습 : ${quizStudyCount}회</span>
+        `;
+    }
+
+    function nextQuizQuestion() {
+        if(quizRemainingIndices.length === 0) {
+            alert(`🎉 해당 항목을 완벽하게 외웠습니다!\n총 ${quizStudyCount}회 반복했습니다.\n다시 섞어서 새롭게 시작합니다.`);
+            localStorage.removeItem(STORAGE_KEY);
+            resetQuiz();
+        }
+
+        const dataIndex = quizRemainingIndices[0];
+        currentQuizItem = db[dataIndex];
+
+        if(currentQuizItem) {
+            qKr.textContent = currentQuizItem.kr;
+        }
+        
+        qAnswer.classList.remove('reveal');
+        btnShowAnswer.style.display = 'inline-block';
+        evalBtns.style.display = 'none';
+        
+        if(currentMode === 'quiz') btnShowAnswer.focus();
+    }
+
+    btnShowAnswer.addEventListener('click', () => {
+        if(!currentQuizItem) return;
+        
+        qCn.textContent = currentQuizItem.cn;
+        
+        const pinyinDisplay = currentQuizItem.hangul 
+            ? `${currentQuizItem.pinyin} [${currentQuizItem.hangul}]` 
+            : currentQuizItem.pinyin;
+        qPinyin.textContent = pinyinDisplay;
+        
+        qAnswer.classList.add('reveal');
+        
+        if(currentQuizItem.audioFile) {
+            currentAudio.src = AUDIO_BASE_URL + currentQuizItem.audioFile;
+            currentAudio.play().catch(e => console.log(e));
+        }
+
+        btnShowAnswer.style.display = 'none';
+        evalBtns.style.display = 'flex';
+        btnEasy.focus();
+    });
+
+    btnEasy.addEventListener('click', () => {
+        quizRemainingIndices.shift();
+        quizStudyCount++;
+        saveQuizProgress();
+        updateQuizProgress();
+        nextQuizQuestion();
+    });
+
+    btnHard.addEventListener('click', () => {
+        const hardItem = quizRemainingIndices.shift();
+        quizRemainingIndices.push(hardItem);
+        quizStudyCount++;
+        saveQuizProgress();
+        updateQuizProgress();
+        nextQuizQuestion();
+    });
+
+    catSelect.addEventListener('change', (e) => {
+        if(!confirm("분류를 변경하면 현재 진도가 초기화됩니다. 변경하시겠습니까?")) {
+            catSelect.value = quizCategory;
+            return;
+        }
+        quizCategory = e.target.value;
+        localStorage.removeItem(STORAGE_KEY);
+        resetQuiz();
+        nextQuizQuestion();
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        if(confirm("이 분류의 진도를 처음부터 다시 시작하시겠습니까?")) {
+            localStorage.removeItem(STORAGE_KEY);
+            resetQuiz
