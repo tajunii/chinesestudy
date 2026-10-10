@@ -98,10 +98,16 @@
             outline: 6px solid #fbbf24; outline-offset: 4px; background-color: #e2e8f0; transform: scale(1.05);
         }
         
-        #eval-btns { display: none; gap: 80px; justify-content: center; margin-top: 40px; }
+        #eval-btns { display: none; gap: 40px; justify-content: center; margin-top: 40px; }
         .eval-btn { font-size: 1.5rem; padding: 20px 40px; border-radius: 50px; font-weight: bold; border: none; cursor: pointer; transition: transform 0.2s; color: white;}
+        
         #btn-easy { background-color: #3b82f6; }
         #btn-easy:focus, #btn-easy:hover { outline: 5px solid #93c5fd; background-color: #2563eb; transform: scale(1.1); }
+        
+        /* 다시듣기 버튼 스타일 추가 */
+        #btn-replay { background-color: #8b5cf6; } 
+        #btn-replay:focus, #btn-replay:hover { outline: 5px solid #c4b5fd; background-color: #7c3aed; transform: scale(1.1); }
+        
         #btn-hard { background-color: #f97316; }
         #btn-hard:focus, #btn-hard:hover { outline: 5px solid #fdba74; background-color: #ea580c; transform: scale(1.1); }
 
@@ -148,8 +154,10 @@
                 <div id="q-pinyin"></div>
             </div>
 
+            <!-- 평가 및 다시듣기 버튼 -->
             <div id="eval-btns">
                 <button id="btn-easy" class="eval-btn">쉬움 (외움)</button>
+                <button id="btn-replay" class="eval-btn">🔊 다시 듣기</button>
                 <button id="btn-hard" class="eval-btn">어려움 (다시)</button>
             </div>
             
@@ -185,14 +193,15 @@
                 }
 
                 const rows = result.data.slice(1);
+                // G열(6) 오디오, F열(5) 뜻으로 맞춘 순서
                 db = rows.map(cols => ({
-                    id: cols[0]?.trim() || "",        // A열: 번호
-                    category: cols[1]?.trim() || "",  // B열: 분류
-                    cn: cols[2]?.trim() || "",        // C열: 중국어
-                    pinyin: cols[3]?.trim() || "",    // D열: 병음
-                    hangul: cols[4]?.trim() || "",    // E열: 한글 발음
-                    kr: cols[5]?.trim() || "",        // F열: 한국어 뜻
-                    audioFile: cols[6]?.trim() || ""  // G열: 음성파일명
+                    id: cols[0]?.trim() || "",        
+                    category: cols[1]?.trim() || "",  
+                    cn: cols[2]?.trim() || "",        
+                    pinyin: cols[3]?.trim() || "",    
+                    hangul: cols[4]?.trim() || "",    
+                    kr: cols[5]?.trim() || "",        
+                    audioFile: cols[6]?.trim() || ""  
                 })).filter(item => item.cn && item.kr);
 
                 if(db.length > 0) {
@@ -320,6 +329,7 @@
     const evalBtns = document.getElementById('eval-btns');
     const btnEasy = document.getElementById('btn-easy');
     const btnHard = document.getElementById('btn-hard');
+    const btnReplay = document.getElementById('btn-replay'); // 다시듣기 버튼 추가
     const catSelect = document.getElementById('categorySelect');
     const progressEl = document.getElementById('progress-bar');
 
@@ -429,7 +439,16 @@
 
         btnShowAnswer.style.display = 'none';
         evalBtns.style.display = 'flex';
-        btnEasy.focus();
+        // 정답을 보여준 직후에는 가운데 있는 '다시듣기' 버튼으로 포커스를 맞춥니다.
+        btnReplay.focus(); 
+    });
+
+    // --- 다시듣기 버튼 클릭 이벤트 ---
+    btnReplay.addEventListener('click', () => {
+        if(currentQuizItem && currentQuizItem.audioFile) {
+            currentAudio.currentTime = 0; // 오디오를 처음으로 되감기
+            currentAudio.play().catch(e => console.log(e));
+        }
     });
 
     btnEasy.addEventListener('click', () => {
@@ -468,6 +487,9 @@
         }
     });
 
+    // ---------------------------------------------------------
+    // TV 리모컨 방향키 로직 (3개 버튼 대응)
+    // ---------------------------------------------------------
     document.addEventListener('keydown', (e) => {
         const isUp = e.key === 'ArrowUp';
         const isDown = e.key === 'ArrowDown';
@@ -493,8 +515,26 @@
         } 
         else if (currentMode === 'quiz') {
             if(evalBtns.style.display === 'flex') {
-                if(isLeft) { e.preventDefault(); btnEasy.focus(); }
-                if(isRight) { e.preventDefault(); btnHard.focus(); }
+                // 현재 포커스된 버튼 확인
+                const activeBtn = document.activeElement;
+                
+                if(isLeft) {
+                    e.preventDefault();
+                    if(activeBtn === btnHard) btnReplay.focus();
+                    else if(activeBtn === btnReplay) btnEasy.focus();
+                    else btnEasy.focus();
+                }
+                if(isRight) {
+                    e.preventDefault();
+                    if(activeBtn === btnEasy) btnReplay.focus();
+                    else if(activeBtn === btnReplay) btnHard.focus();
+                    else btnHard.focus();
+                }
+                // 위/아래 키를 누르면 무조건 가운데 '다시듣기'로 가도록 편의성 추가
+                if(isUp || isDown) {
+                    e.preventDefault();
+                    btnReplay.focus();
+                }
             } else if(evalBtns.style.display === 'none') {
                 if(isLeft) { switchMode('preview'); }
             }
