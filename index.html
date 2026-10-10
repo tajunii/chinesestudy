@@ -131,8 +131,7 @@
     <!-- 1. 예습 모드 영역 -->
     <div id="view-preview" class="max-w-5xl mx-auto p-4 w-full">
         <div id="preview-list" class="pb-32">
-            <!-- 자바스크립트로 문장 목록이 여기에 생성됩니다 -->
-            <p class="text-center text-xl mt-10">데이터를 불러오는 중입니다...</p>
+            <p class="text-center text-xl mt-10 text-yellow-400">데이터를 불러오는 중입니다...</p>
         </div>
     </div>
 
@@ -165,7 +164,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
-// ---------------------------------------------------------
+    // ---------------------------------------------------------
     // 1. 공통 데이터 및 설정
     // ---------------------------------------------------------
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRTUWrzsscnZ3sHRvSenqLY4o1c-mkvZLYV9GDTdhjvwkyBI7AYjkIRGFKX3Qjdftb7NL5m6HGnAYwS/pub?gid=1532593803&single=true&output=csv";
@@ -186,13 +185,11 @@
             header: false,
             skipEmptyLines: true,
             complete: function(result) {
-                // 구글 시트가 웹에 게시되지 않아 HTML(로그인 페이지)을 반환한 경우 방어
                 if (result.data.length > 0 && result.data[0][0] && result.data[0][0].includes("<!DOCTYPE html>")) {
                     showError("구글 시트가 <b>'웹에 게시'</b> 되지 않았습니다.<br>[파일 -> 공유 -> 웹에 게시]를 확인해주세요.");
                     return;
                 }
 
-                // 첫 줄(헤더) 제외
                 const rows = result.data.slice(1);
                 db = rows.map(cols => ({
                     id: cols[0]?.trim() || "",
@@ -201,7 +198,7 @@
                     pinyin: cols[3]?.trim() || "",
                     kr: cols[4]?.trim() || "",
                     audioFile: cols[5]?.trim() || "",
-                    hangul: cols[6]?.trim() || "" // G열 한글 발음
+                    hangul: cols[6]?.trim() || "" 
                 })).filter(item => item.cn && item.kr);
 
                 if(db.length > 0) {
@@ -211,25 +208,4 @@
                     showError("데이터를 찾을 수 없습니다.<br>시트에 데이터가 올바르게 입력되어 있는지 확인해주세요.");
                 }
             },
-            error: function(err) {
-                console.error("데이터 로드 실패:", err);
-                showError("데이터를 가져오지 못했습니다. (에러: " + err.message + ")<br>인터넷 연결이나 시트의 '웹에 게시' 상태를 확인하세요.");
-            }
-        });
-    }
-
-    function showError(message) {
-        document.getElementById("preview-list").innerHTML = 
-            `<div class="text-center p-8 bg-slate-800 rounded-lg max-w-2xl mx-auto mt-10">
-                <h2 class="text-2xl text-red-400 font-bold mb-4">데이터 연동 오류</h2>
-                <p class="text-xl text-slate-300">${message}</p>
-            </div>`;
-        document.getElementById("q-kr").textContent = "데이터 로드 실패";
-        document.getElementById("btn-show-answer").style.display = "none";
-    }
-
-    // --- 이하 기존 코드 (switchMode, initPreviewMode 등) 동일하게 유지 ---
-
-</script>
-</body>
-</html>
+            error: function(err)
