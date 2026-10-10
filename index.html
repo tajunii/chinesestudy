@@ -478,3 +478,58 @@
         if(confirm("이 분류의 진도를 처음부터 다시 시작하시겠습니까?")) {
             localStorage.removeItem(STORAGE_KEY);
             resetQuiz
+document.getElementById('btn-reset').addEventListener('click', () => {
+        if(confirm("이 분류의 진도를 처음부터 다시 시작하시겠습니까?")) {
+            localStorage.removeItem(STORAGE_KEY);
+            resetQuiz();
+            nextQuizQuestion();
+        }
+    });
+
+    // ---------------------------------------------------------
+    // 6. TV 리모컨 통합 컨트롤 (키보드 이벤트)
+    // ---------------------------------------------------------
+    document.addEventListener('keydown', (e) => {
+        const isUp = e.key === 'ArrowUp';
+        const isDown = e.key === 'ArrowDown';
+        const isLeft = e.key === 'ArrowLeft';
+        const isRight = e.key === 'ArrowRight';
+        const isEnter = e.key === 'Enter' || e.key === 'MediaPlayPause';
+
+        if(currentMode === 'preview') {
+            if(isDown) {
+                e.preventDefault();
+                previewFocusIndex = Math.min(previewFocusIndex + 1, previewNodes.length - 1);
+                updatePreviewFocus();
+            } else if (isUp) {
+                e.preventDefault();
+                previewFocusIndex = Math.max(previewFocusIndex - 1, 0);
+                updatePreviewFocus();
+            } else if (isEnter) {
+                e.preventDefault();
+                playCurrentPreviewAudio();
+            } else if (isRight) {
+                switchMode('quiz');
+            }
+        } 
+        else if (currentMode === 'quiz') {
+            if(evalBtns.style.display === 'flex') {
+                if(isLeft) { e.preventDefault(); btnEasy.focus(); }
+                if(isRight) { e.preventDefault(); btnHard.focus(); }
+            } else if(evalBtns.style.display === 'none') {
+                if(isLeft) { switchMode('preview'); }
+            }
+        }
+    });
+
+    // 홈 버튼
+    document.getElementById('homeBtn').addEventListener('click', () => {
+        location.href = "https://tajunii.github.io/study-home/";
+    });
+
+    // 앱 구동 명령
+    window.onload = loadData;
+
+</script>
+</body>
+</html>
